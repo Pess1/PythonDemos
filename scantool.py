@@ -1,19 +1,32 @@
 import datetime
-import os
+import subprocess
+import sys
+import re
 
 def main():
-	serverIp = '0.0.0.0'
-	serverNames = ['test_server1', "test_server2", "test_server3"]
+	serverIps = ['0.0.0.0']
+	userName = 'uname'
 
-	i = 0
+	for serverIp in serverIps:
 
-	for serverName in serverNames:
-		created = datetime.datetime.now()
-		file = serverName + "_" + str(created.year) + "-" + str(created.month) + "-" + str(created.day) + "_" + created.strftime("%X") + ".txt"
+		ssh = subprocess.Popen(['ssh', '-t', userName + '@' + serverIp, "dpkg -l | grep -E 'mariadb|postgresql|nodejs'",],
+			shell=False,
+			stdout=subprocess.PIPE,
+			stderr=subprocess.PIPE)
+		results = ssh.stdout.readlines()
 
-		with open(file, 'w') as output:
-
-			commandOutput = os.popen('ls -l').read()
-			output.write(commandOutput)
-
+		if not results:
+			error = ssh.stderr.readlines()
+			print('ERROR: %s' % error, sys.stderr)
+		else:
+			outputArr = []
+			dict = {"depName": "", "depVer": ""}
+			for result in results:
+				formattedResult = str(result)[6:72].strip()
+				objectData = re.sub("\s+", "|", formattedResult).split("|")
+				dict["depName"] = objectData[0]
+				dict["depVer"] = objectData[1]
+				outputArr.append(dict)
+			serverDict = {"serverIp": serverIp, "depInfo": outputArr}
+			print(serverDict)
 main()
